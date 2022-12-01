@@ -639,7 +639,7 @@ class BuildTemplateMixin:
             )
             output_artifacts.append(
                 codepipeline.OutputArtifacts(
-                    Name=f"{base_template.PACKAGE_OUTPUT_ARTIFACT}_{version_name}"
+                    Name=f"{base_template.BUILD_OUTPUT_ARTIFACT}_{version_name}"
                 ),
             )
             secondary_artifacts[f"Build_{version_name}"] = {
