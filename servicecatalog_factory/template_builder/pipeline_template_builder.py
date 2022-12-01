@@ -571,6 +571,40 @@ class BuildTemplateMixin:
         self, tpl, versions, stages, input_artifact_name
     ) -> codepipeline.Stages:
         build_stage = stages.get("Build", {})
+        input_artifacts = list()
+        output_artifacts = list()
+        secondary_artifacts = dict()
+        count = 0
+        path = versions[0].get("Source", {}).get("Path", ".")
+        for version in versions:
+            version_name = version.get("Name")
+            base_directory = (
+                "$CODEBUILD_SRC_DIR"
+                if count == 0
+                else f"$CODEBUILD_SRC_DIR_Source_{version_name}"
+            )
+            input_artifacts.append(
+                codepipeline.InputArtifacts(
+                    Name=f"{input_artifact_name}_{version_name}"
+                ),
+            )
+            output_artifacts.append(
+                codepipeline.OutputArtifacts(
+                    Name=f"{base_template.BUILD_OUTPUT_ARTIFACT}_{version_name}"
+                ),
+            )
+            secondary_artifacts[f"Build_{version_name}"] = {
+                "base-directory": base_directory,
+                "files": "**/*",
+            }
+            count += 1
+        
+        buildspec = yaml.safe_load(build_stage.get("BuildSpec"))
+        buildspec_artifacts = buildspec.get("artifacts", {})
+        buildspec_artifacts.extend({
+            'secondary_artifacts': secondary_artifacts
+        })
+        buildspec['artifacts'] = buildspec_artifacts
 
         tpl.add_resource(
             codebuild.Project(
@@ -614,39 +648,11 @@ class BuildTemplateMixin:
                     ],
                 ),
                 Source=codebuild.Source(
-                    BuildSpec=build_stage.get("BuildSpec"), Type="CODEPIPELINE",
+                    BuildSpec=yaml.safe_dump(buildspec), Type="CODEPIPELINE",
                 ),
                 Description=t.Sub("build project"),
             )
         )
-
-        input_artifacts = list()
-        output_artifacts = list()
-        secondary_artifacts = dict()
-        count = 0
-        path = versions[0].get("Source", {}).get("Path", ".")
-        for version in versions:
-            version_name = version.get("Name")
-            base_directory = (
-                "$CODEBUILD_SRC_DIR"
-                if count == 0
-                else f"$CODEBUILD_SRC_DIR_Source_{version_name}"
-            )
-            input_artifacts.append(
-                codepipeline.InputArtifacts(
-                    Name=f"{input_artifact_name}_{version_name}"
-                ),
-            )
-            output_artifacts.append(
-                codepipeline.OutputArtifacts(
-                    Name=f"{base_template.BUILD_OUTPUT_ARTIFACT}_{version_name}"
-                ),
-            )
-            secondary_artifacts[f"Build_{version_name}"] = {
-                "base-directory": base_directory,
-                "files": "**/*",
-            }
-            count += 1
 
         return codepipeline.Stages(
             Name="Build",
