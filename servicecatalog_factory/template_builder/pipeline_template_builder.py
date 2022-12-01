@@ -571,10 +571,6 @@ class BuildTemplateMixin:
         self, tpl, versions, stages, input_artifact_name
     ) -> codepipeline.Stages:
         build_stage = stages.get("Build", {})
-        version = versions[0]
-        version_name = version.get("Name")
-        path = version.get("Source", {}).get("Path", ".")
-        input_artifact_name_to_use = f"{input_artifact_name}_{version_name}"
 
         tpl.add_resource(
             codebuild.Project(
@@ -624,6 +620,34 @@ class BuildTemplateMixin:
             )
         )
 
+        input_artifacts = list()
+        output_artifacts = list()
+        secondary_artifacts = dict()
+        count = 0
+        path = versions[0].get("Source", {}).get("Path", ".")
+        for version in versions:
+            version_name = version.get("Name")
+            base_directory = (
+                "$CODEBUILD_SRC_DIR"
+                if count == 0
+                else f"$CODEBUILD_SRC_DIR_Source_{version_name}"
+            )
+            input_artifacts.append(
+                codepipeline.InputArtifacts(
+                    Name=f"{input_artifact_name}_{version_name}"
+                ),
+            )
+            output_artifacts.append(
+                codepipeline.OutputArtifacts(
+                    Name=f"{base_template.PACKAGE_OUTPUT_ARTIFACT}_{version_name}"
+                ),
+            )
+            secondary_artifacts[f"Build_{version_name}"] = {
+                "base-directory": base_directory,
+                "files": "**/*",
+            }
+            count += 1
+
         return codepipeline.Stages(
             Name="Build",
             Actions=[
@@ -633,18 +657,12 @@ class BuildTemplateMixin:
                     RoleArn=t.Sub(
                         "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/servicecatalog-product-factory/SourceRole"
                     ),
-                    InputArtifacts=[
-                        codepipeline.InputArtifacts(Name=input_artifact_name_to_use),
-                    ],
+                    InputArtifacts=input_artifacts,
                     ActionTypeId=codebuild_troposphere_constants.ACTION_TYPE_ID_FOR_BUILD,
-                    OutputArtifacts=[
-                        codepipeline.OutputArtifacts(
-                            Name=f"{base_template.BUILD_OUTPUT_ARTIFACT}_{version_name}"
-                        )
-                    ],
+                    OutputArtifacts=output_artifacts,
                     Configuration={
                         "ProjectName": t.Sub("${AWS::StackName}-BuildProject"),
-                        "PrimarySource": input_artifact_name_to_use,
+                        "PrimarySource": input_artifacts[0].Name,
                         "EnvironmentVariables": t.Sub(
                             json.dumps(
                                 [
