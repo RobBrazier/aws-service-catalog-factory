@@ -687,6 +687,11 @@ class BuildTemplateMixin:
                                         value=path,
                                         type="PLAINTEXT",
                                     ),
+                                    dict(
+                                        name="STACK_NAME",
+                                        value="${AWS::StackName}",
+                                        type="PLAINTEXT",
+                                    ),
                                 ]
                             )
                         ),
