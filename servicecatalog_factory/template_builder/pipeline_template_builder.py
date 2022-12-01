@@ -602,7 +602,7 @@ class BuildTemplateMixin:
         buildspec = yaml.safe_load(build_stage.get("BuildSpec"))
         buildspec_artifacts = buildspec.get("artifacts", {})
         buildspec_artifacts.update({
-            'secondary_artifacts': secondary_artifacts
+            'secondary-artifacts': secondary_artifacts
         })
         buildspec['artifacts'] = buildspec_artifacts
 
